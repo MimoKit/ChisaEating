@@ -260,7 +260,6 @@
       "{bot_a}在穿过隧门的过程中，意外来到了{world_b}，并和{bot_b}一起吃了{full_food_desc}！",
       "{bot_a}为了寻找稀有食材，不小心跌入时空裂缝掉进{world_b}，被{bot_b}请客吃了一顿{full_food_desc}。",
       "次元壁破裂啦！{bot_a}从{world_b}顺手拿走了一份{full_food_desc}，并高高兴兴地带回了{world_a}。",
-      "Due to variations in timelines, {bot_a} from {world_a} and {bot_b} from {world_b} encountered each other by chance, and decided to eat this {full_food_desc} first to calm down!",
       "{bot_a}在探索新区域时迷路到了{world_b}，刚好遇到了正端着一盘{full_food_desc}的{bot_b}。"
     ]
   },
@@ -314,7 +313,7 @@
         },
         "default": [
           "索拉里斯",
-          "今州"
+          "鸣潮世界"
         ]
       },
       "3.自称池": {
@@ -440,7 +439,7 @@
         "description": "1.世界名称",
         "hint": "当前世界的主名称",
         "type": "string",
-        "default": "原神"
+        "default": "原神世界"
       },
       "2.世界别称": {
         "description": "2.世界别称",
