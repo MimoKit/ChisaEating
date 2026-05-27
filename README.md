@@ -24,6 +24,8 @@
 * 编写专属语录：在 佩可莉姆 文件夹内新建一个文本文件，命名为 words.txt。打开它，按照“一行一句话”的格式写入你的抢饭彩蛋即可
 
 # 🍱 千小妹还在吃 (Chisa Still Eating)
+[![AstrBot](https://img.shields.io/badge/Framework-AstrBot-🚀_purple.svg)](https://github.com/Soulter/AstrBot)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 一个为 [AstrBot](https://github.com/Soulter/AstrBot) 打造的沉浸式跨次元干饭插件。
 每天都在纠结吃什么？那就让二次元的向导们来帮你随机摇号吧！
