@@ -1,4 +1,34 @@
 {
+  "enable_blacklist": {
+    "description": "🚫 启用群聊黑名单",
+    "hint": "【最高优先级】开启后，黑名单内的群组将绝对无法触发吃什么功能。",
+    "type": "bool",
+    "default": false
+  },
+  "blacklist_groups": {
+    "description": "📝 群聊黑名单列表",
+    "hint": "在此填写需要屏蔽的群号（点击添加，一行一个）。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
+  "enable_whitelist": {
+    "description": "✅ 启用群聊白名单",
+    "hint": "开启后，只有在白名单内的群组才能触发功能。（注意：若一个群同时在黑白名单内，会被黑名单拦截）",
+    "type": "bool",
+    "default": false
+  },
+  "whitelist_groups": {
+    "description": "📝 群聊白名单列表",
+    "hint": "在此填写允许使用的群号（点击添加，一行一个）。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "default": []
+  },
   "active_world": {
     "description": "🎯 默认激活世界观",
     "hint": "下拉选择默认主导推荐官所在的世界。用于决定常规句式人称 and 基础表情包来源。",
