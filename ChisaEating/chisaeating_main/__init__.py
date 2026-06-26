@@ -139,20 +139,6 @@ _WORLD_PHRASES: Dict[str, WorldPhrasesData] = {
     },
 }
 
-_HELP_TEXT = (
-    "🍱 【千小妹还在吃】干饭指南\n\n"
-    "🍔 基础点餐：\n"
-    "· 吃什么 / 喝什么（全宇宙随机）\n"
-    "· 来点现实的食物 / 来点现实的饮品\n\n"
-    "✨ 异界特产：\n"
-    "· 鸣潮特产 / 原神特产（指定世界）\n"
-    "· 来点黑暗料理\n\n"
-    "🤖 MOD干饭人：\n"
-    "· 在 data/ChisaEating/ganfanren/ 下新建文件夹\n"
-    "  放入表情包即可自动加载"
-)
-
-
 def _get_wv_settings() -> Dict[str, WorldConf]:
     result: Dict[str, WorldConf] = {}
     for i in range(1, 5):
@@ -199,16 +185,6 @@ def _build_config_snapshot() -> ConfigSnapshot:
         chef_meme_prob=CHISA_CONFIG.get_config("chef_meme_prob").data,
         interception_egg_chance=CHISA_CONFIG.get_config("interception_egg_chance").data,
     )
-
-
-@sv.on_fullmatch(
-    ("千小妹还在吃帮助", "千咲吃什么帮助", "干饭帮助", "美食帮助"),
-    prefix=False,
-    block=True,
-)
-async def chisa_help(bot: Bot, ev: Event) -> None:
-    logger.info(f"[ChisaEating] 帮助指令 | uid={ev.user_id} gid={ev.group_id}")
-    await bot.send(_HELP_TEXT)
 
 
 @sv.on_keyword(_EAT_KWS, prefix=False)
