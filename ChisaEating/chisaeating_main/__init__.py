@@ -1,8 +1,9 @@
-import re
 import random
 from pathlib import Path
+from typing import Optional
 
 from gsuid_core.bot import Bot
+from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.segment import MessageSegment
 from gsuid_core.sv import SV
@@ -19,7 +20,13 @@ _image_mgr = ImageManager(_plugin_dir)
 _data_mgr = FoodDataManager()
 _rate_limiter = RateLimiter()
 
-# 世界专属句式（内置默认，不放配置以避免臃肿）
+_EAT_KWS = ("吃什么", "吃啥", "吃点儿啥", "吃点啥")
+_DRINK_KWS = ("喝什么", "喝啥", "喝点儿啥", "喝点啥")
+_DARK_KWS = ("来点黑暗料理", "黑暗料理")
+_COMMON_EAT_KWS = ("来点现实的食物", "来点三次元食物")
+_COMMON_DRINK_KWS = ("来点现实的饮品", "来点三次元饮品")
+_ALL_CAT_KWS = _EAT_KWS + _DRINK_KWS + _DARK_KWS + _COMMON_EAT_KWS + _COMMON_DRINK_KWS
+
 _WORLD_PHRASES: dict = {
     "world1": {
         "专属句式": [
@@ -139,87 +146,100 @@ def _build_config_snapshot() -> dict:
         "repeat_prob", "repeat_cooldown",
         "global_meme_prob", "chef_meme_prob", "interception_egg_chance",
     ]
-    snap = {k: _cfg(k) for k in keys}
-    return snap
+    return {k: _cfg(k) for k in keys}
 
 
-@sv.on_message()
-async def chisa_handler(bot: Bot, ev: Event):
-    msg_text = ev.raw_text
-    if not msg_text:
+@sv.on_fullmatch(
+    ("千小妹还在吃帮助", "千咲吃什么帮助", "干饭帮助", "美食帮助"),
+    prefix=False,
+    block=True,
+)
+async def chisa_help(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 帮助指令 | uid={ev.user_id} gid={ev.group_id}")
+    await bot.send(_HELP_TEXT)
+
+
+@sv.on_keyword(_EAT_KWS, prefix=False)
+async def on_eat(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 点餐(食) | uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "food")
+
+
+@sv.on_keyword(_DRINK_KWS, prefix=False)
+async def on_drink(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 点餐(饮) | uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "drink")
+
+
+@sv.on_keyword(_DARK_KWS, prefix=False)
+async def on_dark(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 点餐(黑暗料理) | uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "dark")
+
+
+@sv.on_keyword(_COMMON_EAT_KWS, prefix=False)
+async def on_common_eat(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 点餐(三次元食) | uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "food", forced_world="common")
+
+
+@sv.on_keyword(_COMMON_DRINK_KWS, prefix=False)
+async def on_common_drink(bot: Bot, ev: Event) -> None:
+    logger.info(f"[ChisaEating] 点餐(三次元饮) | uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "drink", forced_world="common")
+
+
+@sv.on_keyword(("特产",), prefix=False)
+async def on_world_special(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if any(k in msg for k in _ALL_CAT_KWS):
+        logger.debug(f"[ChisaEating] 特产+吃喝词同现，交由对应处理器 | msg={msg!r}")
         return
-    msg_text = msg_text.strip()
-
-    # 帮助命令
-    if msg_text in ["千小妹还在吃帮助", "千咲吃什么帮助", "干饭帮助", "美食帮助"]:
-        await bot.send(_HELP_TEXT)
-        return
-
-    # 构建触发词正则
-    eat_kws = _cfg("trigger_eat", ["吃什么", "吃啥", "吃点儿啥"]) or []
-    drink_kws = _cfg("trigger_drink", ["喝什么", "喝啥", "喝点儿啥"]) or []
-    dark_kws = _cfg("trigger_dark", ["来点黑暗料理", "黑暗料理"]) or []
-    ce_kws = _cfg("trigger_common_eat", ["来点现实的食物", "来点三次元食物"]) or []
-    cd_kws = _cfg("trigger_common_drink", ["来点现实的饮品", "来点三次元饮品"]) or []
-
-    def _pat(kws):
-        parts = [re.escape(k) for k in kws if k]
-        return re.compile("|".join(parts)) if parts else None
-
-    pat_eat = _pat(eat_kws)
-    pat_drink = _pat(drink_kws)
-    pat_dark = _pat(dark_kws)
-    pat_ce = _pat(ce_kws)
-    pat_cd = _pat(cd_kws)
-
-    category = None
-    forced_world = None
-
-    if pat_dark and pat_dark.search(msg_text):
-        category = "dark"
-    elif pat_ce and pat_ce.search(msg_text):
-        category = "food"
-        forced_world = "common"
-    elif pat_cd and pat_cd.search(msg_text):
-        category = "drink"
-        forced_world = "common"
-    elif pat_drink and pat_drink.search(msg_text):
-        category = "drink"
-    elif pat_eat and pat_eat.search(msg_text):
-        category = "food"
-
     wv_settings = _get_wv_settings()
     alias_map = _build_alias_map(wv_settings)
-
+    forced_world = next((wk for alias, wk in alias_map.items() if alias in msg), None)
     if not forced_world:
-        for alias, wk in alias_map.items():
-            if category and alias in msg_text:
-                forced_world = wk
-                break
-            if not category and (f"{alias}特产" in msg_text or f"{alias}吃" in msg_text):
-                category = "food"
-                forced_world = wk
-                break
-
-    if not category:
+        logger.debug(f"[ChisaEating] 特产：未匹配到世界别称，忽略 | msg={msg!r}")
         return
+    logger.info(f"[ChisaEating] 世界特产 | world={forced_world} uid={ev.user_id} gid={ev.group_id}")
+    await _process_request(bot, ev, "food", forced_world=forced_world)
 
-    # 黑白名单
+
+async def _process_request(
+    bot: Bot,
+    ev: Event,
+    category: str,
+    forced_world: Optional[str] = None,
+) -> None:
+    msg = ev.raw_text.strip()
+    uid = ev.user_id
     group_id = ev.group_id or ev.user_id
     gid_str = str(group_id) if group_id else ""
+
+    # 黑白名单
     if gid_str:
         if _cfg("enable_blacklist", False):
             bl = [str(x).strip() for x in (_cfg("blacklist_groups") or []) if str(x).strip()]
             if gid_str in bl:
+                logger.debug(f"[ChisaEating] 群 {gid_str} 在黑名单，跳过")
                 return
         if _cfg("enable_whitelist", False):
             wl = [str(x).strip() for x in (_cfg("whitelist_groups") or []) if str(x).strip()]
             if gid_str not in wl:
+                logger.debug(f"[ChisaEating] 群 {gid_str} 不在白名单，跳过")
                 return
 
-    uid = ev.user_id
+    wv_settings = _get_wv_settings()
 
-    # 确定活跃世界
+    # 未由调用方指定世界时，从消息别称自动检测
+    if forced_world is None:
+        alias_map = _build_alias_map(wv_settings)
+        for alias, wk in alias_map.items():
+            if alias in msg:
+                forced_world = wk
+                logger.debug(f"[ChisaEating] 别称匹配 alias={alias!r} -> world={wk}")
+                break
+
     active_key = forced_world if (forced_world and forced_world != "common") else _resolve_active_key()
     active_conf = wv_settings.get(active_key, {})
     active_phrases = _WORLD_PHRASES.get(active_key, {})
@@ -238,6 +258,7 @@ async def chisa_handler(bot: Bot, ev: Event):
     spam_threshold = config_snap.get("spam_threshold", 3)
     if _rate_limiter.is_spaming(uid, spam_threshold):
         interception_chance = config_snap.get("interception_egg_chance", 50)
+        logger.debug(f"[ChisaEating] 触发防刷屏 uid={uid}")
         if random.randint(1, 100) <= interception_chance:
             inter_text = "【拦截警报】你点得太快啦！千咲怕你撑着，已经先你一步把厨房吃空了！"
             meme_file = _image_mgr.get_egg_meme("千咲")
@@ -256,6 +277,7 @@ async def chisa_handler(bot: Bot, ev: Event):
     repeat_prob = config_snap.get("repeat_prob", 10)
     if not _rate_limiter.is_repeat_in_cooldown(gid_str, repeat_cooldown) and random.randint(1, 100) <= repeat_prob:
         _rate_limiter.record_repeat_trigger(gid_str)
+        logger.debug(f"[ChisaEating] 触发摆烂复读 gid={gid_str}")
         fallback_pool = _cfg("generic_templates") or ["是啊，{food}好像都不错"]
         text = random.choice(fallback_pool).format(bot=bot_name, food="什么")
         meme_file = _image_mgr.get_bot_meme(active_key, "think")
@@ -281,15 +303,23 @@ async def chisa_handler(bot: Bot, ev: Event):
         if name:
             pool.append({"wv": "common", "food": name, "raw_name": name, "chef": "none", "has_image": False, "path": None})
 
+    logger.debug(f"[ChisaEating] 卡池扫描完毕 size={len(pool)} category={category} forced_world={forced_world}")
+
     # 强制世界过滤
     if forced_world:
         strict = [item for item in pool if item["wv"] == forced_world]
         if strict:
             pool = strict
 
+    if not pool:
+        logger.warning(f"[ChisaEating] 卡池为空 category={category} forced_world={forced_world}")
+        await bot.send("【卡池告急】未找到可用的食物/饮品数据！请检查资源目录或配置。")
+        return
+
     picked = _data_mgr.filter_and_pick(gid_str, pool, active_key, config_snap)
 
     if not picked:
+        logger.warning(f"[ChisaEating] filter_and_pick 返回空 category={category} forced_world={forced_world}")
         await bot.send("【卡池告急】未找到可用的食物/饮品数据！请检查资源目录或配置。")
         return
 
@@ -297,6 +327,11 @@ async def chisa_handler(bot: Bot, ev: Event):
     chef_name = picked["chef"]
     origin_key = picked["wv"]
     full_food_desc = f"由【{chef_name}】特制的{food_name}" if chef_name != "none" else food_name
+
+    logger.info(
+        f"[ChisaEating] 推荐 food={food_name!r} chef={chef_name!r} "
+        f"origin={origin_key} img={bool(picked.get('has_image'))}"
+    )
 
     fmt_args = {
         "bot": bot_name, "bot_a": bot_name,
