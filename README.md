@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/nnlmc/ChisaEating"><img src="logo.png" width="256" height="256" alt="ChisaEating"></a>
+  <a href="https://github.com/nnlmc/ChisaEating"><img src="ICON.png" width="256" height="256" alt="ChisaEating"></a>
 </p>
 <h1 align="center">千小妹还在吃 3.0.0</h1>
 <h4 align="center">🚧 支持 gscore 框架的跨次元干饭插件，功能持续更新中 🚧</h4>
