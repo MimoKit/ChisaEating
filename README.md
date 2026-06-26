@@ -15,7 +15,7 @@
 
 ## 丨安装提醒
 
-> **注意：该插件为 [早柚核心 (gsuid_core)](https://github.com/Gscore/gsuid_core) 的扩展插件，使用前请确保已正确安装 gsuid_core。**
+> **注意：该插件为 [早柚核心 (gsuid_core)](https://github.com/Genshin-bots/gsuid_core) 的扩展插件，使用前请确保已正确安装 gsuid_core。**
 
 > 🚧 插件仍在持续完善中，欢迎提交 issue 或 PR 🚧
 
@@ -91,7 +91,7 @@ git clone https://github.com/nnlmc/ChisaEating ChisaEating
 ## 丨致谢
 
 - [Rua432 (dddada123)](https://github.com/dddada123) — 原版插件作者
-- [gsuid_core](https://github.com/Gscore/gsuid_core) — 早柚核心框架
+- [gsuid_core](https://github.com/Genshin-bots/gsuid_core) — 早柚核心框架
 
 ---
 
