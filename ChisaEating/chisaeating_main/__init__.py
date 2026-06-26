@@ -1,6 +1,6 @@
 import random
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional, TypedDict
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -27,7 +27,60 @@ _COMMON_EAT_KWS = ("来点现实的食物", "来点三次元食物")
 _COMMON_DRINK_KWS = ("来点现实的饮品", "来点三次元饮品")
 _ALL_CAT_KWS = _EAT_KWS + _DRINK_KWS + _DARK_KWS + _COMMON_EAT_KWS + _COMMON_DRINK_KWS
 
-_WORLD_PHRASES: dict = {
+# TypedDicts for all structured data.
+# Chinese-key variants use the functional form so keys can be non-identifiers.
+WorldConf = TypedDict(
+    "WorldConf",
+    {
+        "名称": str,
+        "别称": List[str],
+        "自称池": List[str],
+        "文字食物": List[str],
+        "文字饮品": List[str],
+        "文字黑暗料理": List[str],
+    },
+)
+
+WorldPhrasesData = TypedDict(
+    "WorldPhrasesData",
+    {
+        "专属句式": List[str],
+        "厨师句式": List[str],
+        "打断句式": List[str],
+    },
+)
+
+
+class PoolItem(TypedDict):
+    wv: str
+    food: str
+    raw_name: str
+    chef: str
+    has_image: bool
+    path: Optional[str]
+
+
+class GanfanrenData(TypedDict):
+    images: List[str]
+    words: List[str]
+
+
+class ConfigSnapshot(TypedDict):
+    mode_loyal: bool
+    mode_roller: bool
+    mode_normie: bool
+    history_limit: int
+    spam_threshold: int
+    egg_prob: int
+    egg_pool: str
+    repeat_prob: int
+    repeat_cooldown: int
+    global_meme_prob: int
+    chef_meme_prob: int
+    interception_egg_chance: int
+
+
+_WORLD_PHRASES: Dict[str, WorldPhrasesData] = {
     "world1": {
         "专属句式": [
             "{bot}觉得今天这顿非{food}莫属啦",
@@ -100,53 +153,52 @@ _HELP_TEXT = (
 )
 
 
-def _cfg(key, default=None):
-    try:
-        return CHISA_CONFIG.get_config(key).data
-    except Exception:
-        return default
-
-
-def _get_wv_settings() -> dict:
-    result = {}
+def _get_wv_settings() -> Dict[str, WorldConf]:
+    result: Dict[str, WorldConf] = {}
     for i in range(1, 5):
         wk = f"world{i}"
         result[wk] = {
-            "名称": _cfg(f"{wk}_name", f"世界{i}"),
-            "别称": _cfg(f"{wk}_aliases", []),
-            "自称池": _cfg(f"{wk}_selfnames", [f"向导{i}"]),
-            "文字食物": _cfg(f"{wk}_food_text", []),
-            "文字饮品": _cfg(f"{wk}_drink_text", []),
-            "文字黑暗料理": _cfg(f"{wk}_dark_text", []),
+            "名称": CHISA_CONFIG.get_config(f"{wk}_name").data,
+            "别称": CHISA_CONFIG.get_config(f"{wk}_aliases").data,
+            "自称池": CHISA_CONFIG.get_config(f"{wk}_selfnames").data,
+            "文字食物": CHISA_CONFIG.get_config(f"{wk}_food_text").data,
+            "文字饮品": CHISA_CONFIG.get_config(f"{wk}_drink_text").data,
+            "文字黑暗料理": CHISA_CONFIG.get_config(f"{wk}_dark_text").data,
         }
     return result
 
 
-def _build_alias_map(wv_settings: dict) -> dict:
-    alias_map: dict = {}
+def _build_alias_map(wv_settings: Dict[str, WorldConf]) -> Dict[str, str]:
+    alias_map: Dict[str, str] = {}
     for wk, conf in wv_settings.items():
-        for alias in conf.get("别称", []):
+        for alias in conf["别称"]:
             if alias:
-                alias_map[str(alias).strip()] = wk
+                alias_map[alias.strip()] = wk
     return alias_map
 
 
 def _resolve_active_key() -> str:
-    sel = _cfg("active_world", "world1")
+    sel: str = CHISA_CONFIG.get_config("active_world").data
     if sel in ("world1", "world2", "world3", "world4"):
         return sel
     return "world1"
 
 
-def _build_config_snapshot() -> dict:
-    keys = [
-        "mode_loyal", "mode_roller", "mode_normie",
-        "history_limit", "spam_threshold",
-        "egg_prob", "egg_pool",
-        "repeat_prob", "repeat_cooldown",
-        "global_meme_prob", "chef_meme_prob", "interception_egg_chance",
-    ]
-    return {k: _cfg(k) for k in keys}
+def _build_config_snapshot() -> ConfigSnapshot:
+    return ConfigSnapshot(
+        mode_loyal=CHISA_CONFIG.get_config("mode_loyal").data,
+        mode_roller=CHISA_CONFIG.get_config("mode_roller").data,
+        mode_normie=CHISA_CONFIG.get_config("mode_normie").data,
+        history_limit=CHISA_CONFIG.get_config("history_limit").data,
+        spam_threshold=CHISA_CONFIG.get_config("spam_threshold").data,
+        egg_prob=CHISA_CONFIG.get_config("egg_prob").data,
+        egg_pool=CHISA_CONFIG.get_config("egg_pool").data,
+        repeat_prob=CHISA_CONFIG.get_config("repeat_prob").data,
+        repeat_cooldown=CHISA_CONFIG.get_config("repeat_cooldown").data,
+        global_meme_prob=CHISA_CONFIG.get_config("global_meme_prob").data,
+        chef_meme_prob=CHISA_CONFIG.get_config("chef_meme_prob").data,
+        interception_egg_chance=CHISA_CONFIG.get_config("interception_egg_chance").data,
+    )
 
 
 @sv.on_fullmatch(
@@ -191,17 +243,21 @@ async def on_common_drink(bot: Bot, ev: Event) -> None:
 
 @sv.on_keyword(("特产",), prefix=False)
 async def on_world_special(bot: Bot, ev: Event) -> None:
-    msg = ev.raw_text.strip()
+    msg: str = ev.raw_text.strip()
     if any(k in msg for k in _ALL_CAT_KWS):
         logger.debug(f"[ChisaEating] 特产+吃喝词同现，交由对应处理器 | msg={msg!r}")
         return
     wv_settings = _get_wv_settings()
     alias_map = _build_alias_map(wv_settings)
-    forced_world = next((wk for alias, wk in alias_map.items() if alias in msg), None)
-    if not forced_world:
+    forced_world: Optional[str] = next(
+        (wk for alias, wk in alias_map.items() if alias in msg), None
+    )
+    if forced_world is None:
         logger.debug(f"[ChisaEating] 特产：未匹配到世界别称，忽略 | msg={msg!r}")
         return
-    logger.info(f"[ChisaEating] 世界特产 | world={forced_world} uid={ev.user_id} gid={ev.group_id}")
+    logger.info(
+        f"[ChisaEating] 世界特产 | world={forced_world} uid={ev.user_id} gid={ev.group_id}"
+    )
     await _process_request(bot, ev, "food", forced_world=forced_world)
 
 
@@ -211,199 +267,256 @@ async def _process_request(
     category: str,
     forced_world: Optional[str] = None,
 ) -> None:
-    msg = ev.raw_text.strip()
-    uid = ev.user_id
-    group_id = ev.group_id or ev.user_id
-    gid_str = str(group_id) if group_id else ""
+    msg: str = ev.raw_text.strip()
+    uid: str = ev.user_id
+    group_id: str = ev.group_id or ev.user_id
+    gid_str: str = str(group_id)
 
     # 黑白名单
-    if gid_str:
-        if _cfg("enable_blacklist", False):
-            bl = [str(x).strip() for x in (_cfg("blacklist_groups") or []) if str(x).strip()]
-            if gid_str in bl:
-                logger.debug(f"[ChisaEating] 群 {gid_str} 在黑名单，跳过")
-                return
-        if _cfg("enable_whitelist", False):
-            wl = [str(x).strip() for x in (_cfg("whitelist_groups") or []) if str(x).strip()]
-            if gid_str not in wl:
-                logger.debug(f"[ChisaEating] 群 {gid_str} 不在白名单，跳过")
-                return
+    if CHISA_CONFIG.get_config("enable_blacklist").data:
+        blacklist: List[str] = [
+            s.strip()
+            for s in CHISA_CONFIG.get_config("blacklist_groups").data
+            if s.strip()
+        ]
+        if gid_str in blacklist:
+            logger.debug(f"[ChisaEating] 群 {gid_str} 在黑名单，跳过")
+            return
 
-    wv_settings = _get_wv_settings()
+    if CHISA_CONFIG.get_config("enable_whitelist").data:
+        whitelist: List[str] = [
+            s.strip()
+            for s in CHISA_CONFIG.get_config("whitelist_groups").data
+            if s.strip()
+        ]
+        if gid_str not in whitelist:
+            logger.debug(f"[ChisaEating] 群 {gid_str} 不在白名单，跳过")
+            return
+
+    wv_settings: Dict[str, WorldConf] = _get_wv_settings()
 
     # 未由调用方指定世界时，从消息别称自动检测
     if forced_world is None:
-        alias_map = _build_alias_map(wv_settings)
+        alias_map: Dict[str, str] = _build_alias_map(wv_settings)
         for alias, wk in alias_map.items():
             if alias in msg:
                 forced_world = wk
                 logger.debug(f"[ChisaEating] 别称匹配 alias={alias!r} -> world={wk}")
                 break
 
-    active_key = forced_world if (forced_world and forced_world != "common") else _resolve_active_key()
-    active_conf = wv_settings.get(active_key, {})
-    active_phrases = _WORLD_PHRASES.get(active_key, {})
+    active_key: str = (
+        forced_world
+        if (forced_world is not None and forced_world != "common")
+        else _resolve_active_key()
+    )
+    active_conf: WorldConf = wv_settings[active_key]
+    active_phrases: WorldPhrasesData = _WORLD_PHRASES[active_key]
 
-    bot_pool = active_conf.get("自称池", ["推荐官"])
-    bot_name = random.choice(bot_pool) if bot_pool else "推荐官"
+    bot_pool: List[str] = active_conf["自称池"]
+    bot_name: str = random.choice(bot_pool) if bot_pool else "推荐官"
 
-    world_name = active_conf.get("名称", f"世界{active_key[-1]}")
-    world_aliases = [a for a in active_conf.get("别称", []) if a]
+    world_name: str = active_conf["名称"]
+    world_aliases: List[str] = [a for a in active_conf["别称"] if a]
     if world_aliases:
         world_name = random.choice([world_name] + world_aliases)
 
-    config_snap = _build_config_snapshot()
+    config_snap: ConfigSnapshot = _build_config_snapshot()
 
     # 防刷屏
-    spam_threshold = config_snap.get("spam_threshold", 3)
-    if _rate_limiter.is_spaming(uid, spam_threshold):
-        interception_chance = config_snap.get("interception_egg_chance", 50)
+    if _rate_limiter.is_spaming(uid, config_snap["spam_threshold"]):
         logger.debug(f"[ChisaEating] 触发防刷屏 uid={uid}")
-        if random.randint(1, 100) <= interception_chance:
+        if random.randint(1, 100) <= config_snap["interception_egg_chance"]:
             inter_text = "【拦截警报】你点得太快啦！千咲怕你撑着，已经先你一步把厨房吃空了！"
-            meme_file = _image_mgr.get_egg_meme("千咲")
+            meme_file: Optional[str] = _image_mgr.get_egg_meme("千咲")
         else:
-            inter_pool = active_phrases.get("打断句式", [f"{bot_name}觉得你点得太频繁了。"])
+            inter_pool: List[str] = active_phrases["打断句式"]
             inter_text = random.choice(inter_pool).format(bot=bot_name)
             meme_file = _image_mgr.get_bot_meme(active_key, "speechless")
         segs = [MessageSegment.text(inter_text)]
-        if meme_file:
+        if meme_file is not None:
             segs.append(MessageSegment.image(Path(meme_file)))
         await bot.send(segs)
         return
 
     # 摆烂复读
-    repeat_cooldown = config_snap.get("repeat_cooldown", 60)
-    repeat_prob = config_snap.get("repeat_prob", 10)
-    if not _rate_limiter.is_repeat_in_cooldown(gid_str, repeat_cooldown) and random.randint(1, 100) <= repeat_prob:
+    if (
+        not _rate_limiter.is_repeat_in_cooldown(gid_str, config_snap["repeat_cooldown"])
+        and random.randint(1, 100) <= config_snap["repeat_prob"]
+    ):
         _rate_limiter.record_repeat_trigger(gid_str)
         logger.debug(f"[ChisaEating] 触发摆烂复读 gid={gid_str}")
-        fallback_pool = _cfg("generic_templates") or ["是啊，{food}好像都不错"]
-        text = random.choice(fallback_pool).format(bot=bot_name, food="什么")
-        meme_file = _image_mgr.get_bot_meme(active_key, "think")
+        fallback_pool: List[str] = CHISA_CONFIG.get_config("generic_templates").data
+        pool_text_fb: List[str] = (
+            fallback_pool if fallback_pool else ["是啊，{food}好像都不错"]
+        )
+        text: str = random.choice(pool_text_fb).format(bot=bot_name, food="什么")
+        repeat_meme: Optional[str] = _image_mgr.get_bot_meme(active_key, "think")
         segs = [MessageSegment.text(text)]
-        if meme_file:
-            segs.append(MessageSegment.image(Path(meme_file)))
+        if repeat_meme is not None:
+            segs.append(MessageSegment.image(Path(repeat_meme)))
         await bot.send(segs)
         return
 
     # 扫描卡池
-    pool = _image_mgr.scan_all_items(wv_settings, category)
+    pool: List[PoolItem] = _image_mgr.scan_all_items(wv_settings, category)
 
     # 混入三次元文字池
+    common_texts: List[str]
     if category == "food":
-        common_texts = _cfg("common_food_text", []) or []
+        common_texts = CHISA_CONFIG.get_config("common_food_text").data
     elif category == "drink":
-        common_texts = _cfg("common_drink_text", []) or []
+        common_texts = CHISA_CONFIG.get_config("common_drink_text").data
     else:
         common_texts = []
 
     for text_item in common_texts:
-        name = str(text_item).strip()
+        name: str = text_item.strip()
         if name:
-            pool.append({"wv": "common", "food": name, "raw_name": name, "chef": "none", "has_image": False, "path": None})
+            pool.append(
+                PoolItem(
+                    wv="common",
+                    food=name,
+                    raw_name=name,
+                    chef="none",
+                    has_image=False,
+                    path=None,
+                )
+            )
 
-    logger.debug(f"[ChisaEating] 卡池扫描完毕 size={len(pool)} category={category} forced_world={forced_world}")
+    logger.debug(
+        f"[ChisaEating] 卡池扫描完毕 size={len(pool)} "
+        f"category={category} forced_world={forced_world}"
+    )
 
     # 强制世界过滤
-    if forced_world:
-        strict = [item for item in pool if item["wv"] == forced_world]
+    if forced_world is not None:
+        strict: List[PoolItem] = [item for item in pool if item["wv"] == forced_world]
         if strict:
             pool = strict
 
     if not pool:
-        logger.warning(f"[ChisaEating] 卡池为空 category={category} forced_world={forced_world}")
+        logger.warning(
+            f"[ChisaEating] 卡池为空 category={category} forced_world={forced_world}"
+        )
         await bot.send("【卡池告急】未找到可用的食物/饮品数据！请检查资源目录或配置。")
         return
 
-    picked = _data_mgr.filter_and_pick(gid_str, pool, active_key, config_snap)
+    picked: Optional[PoolItem] = _data_mgr.filter_and_pick(
+        gid_str, pool, active_key, config_snap
+    )
 
-    if not picked:
-        logger.warning(f"[ChisaEating] filter_and_pick 返回空 category={category} forced_world={forced_world}")
+    if picked is None:
+        logger.warning(
+            f"[ChisaEating] filter_and_pick 返回空 "
+            f"category={category} forced_world={forced_world}"
+        )
         await bot.send("【卡池告急】未找到可用的食物/饮品数据！请检查资源目录或配置。")
         return
 
-    food_name = picked["food"]
-    chef_name = picked["chef"]
-    origin_key = picked["wv"]
-    full_food_desc = f"由【{chef_name}】特制的{food_name}" if chef_name != "none" else food_name
+    food_name: str = picked["food"]
+    chef_name: str = picked["chef"]
+    origin_key: str = picked["wv"]
+    full_food_desc: str = (
+        f"由【{chef_name}】特制的{food_name}" if chef_name != "none" else food_name
+    )
 
     logger.info(
         f"[ChisaEating] 推荐 food={food_name!r} chef={chef_name!r} "
-        f"origin={origin_key} img={bool(picked.get('has_image'))}"
+        f"origin={origin_key} img={picked['has_image']}"
     )
 
-    fmt_args = {
-        "bot": bot_name, "bot_a": bot_name,
-        "food": food_name, "chef": chef_name,
+    fmt_args: Dict[str, str] = {
+        "bot": bot_name,
+        "bot_a": bot_name,
+        "food": food_name,
+        "chef": chef_name,
         "full_food_desc": full_food_desc,
         "world_a": world_name,
     }
 
-    is_crossover = origin_key != "common" and origin_key != active_key
-    mood = "like"
+    is_crossover: bool = origin_key != "common" and origin_key != active_key
+    mood: str = "like"
+    final_text: str
 
     if category == "dark":
-        pool_text = _cfg("dark_templates") or ["这{full_food_desc}……{bot}已经在害怕了。"]
+        dark_tpls: List[str] = CHISA_CONFIG.get_config("dark_templates").data
+        pool_text: List[str] = (
+            dark_tpls if dark_tpls else ["这{full_food_desc}……{bot}已经在害怕了。"]
+        )
         final_text = random.choice(pool_text).format(**fmt_args)
         mood = "scared"
     elif is_crossover:
-        cross_conf = wv_settings.get(origin_key, {})
-        world_b = cross_conf.get("名称", "异世界")
-        world_b_aliases = [a for a in cross_conf.get("别称", []) if a]
+        cross_conf: WorldConf = wv_settings[origin_key]
+        world_b: str = cross_conf["名称"]
+        world_b_aliases: List[str] = [a for a in cross_conf["别称"] if a]
         if world_b_aliases:
             world_b = random.choice([world_b] + world_b_aliases)
         fmt_args["world_b"] = world_b
-        bot_b_pool = cross_conf.get("自称池", ["异界人"])
+        bot_b_pool: List[str] = cross_conf["自称池"]
         fmt_args["bot_b"] = random.choice(bot_b_pool) if bot_b_pool else "异界人"
-        pool_text = _cfg("crossover_templates") or ["{bot_a}和{bot_b}一起分享了{full_food_desc}！"]
-        final_text = random.choice(pool_text).format(**fmt_args)
+        cross_tpls: List[str] = CHISA_CONFIG.get_config("crossover_templates").data
+        cross_pool: List[str] = (
+            cross_tpls
+            if cross_tpls
+            else ["{bot_a}和{bot_b}一起分享了{full_food_desc}！"]
+        )
+        final_text = random.choice(cross_pool).format(**fmt_args)
     elif chef_name != "none":
-        chef_phrases = active_phrases.get("厨师句式", ["【{chef}】特制了{food}哦"])
+        chef_phrases: List[str] = active_phrases["厨师句式"]
         final_text = random.choice(chef_phrases).format(**fmt_args)
     elif origin_key == "common":
-        pool_text = _cfg("generic_templates") or ["铛铛！为你抽中了{food}！"]
-        final_text = random.choice(pool_text).format(**fmt_args)
+        generic_tpls: List[str] = CHISA_CONFIG.get_config("generic_templates").data
+        generic_pool: List[str] = (
+            generic_tpls if generic_tpls else ["铛铛！为你抽中了{food}！"]
+        )
+        final_text = random.choice(generic_pool).format(**fmt_args)
     else:
-        spec_phrases = active_phrases.get("专属句式", [])
-        generic = _cfg("generic_templates") or ["铛铛！为你抽中了{food}！"]
-        pool_text = spec_phrases + generic
-        final_text = random.choice(pool_text).format(**fmt_args)
+        spec_phrases: List[str] = active_phrases["专属句式"]
+        generic_tpls2: List[str] = CHISA_CONFIG.get_config("generic_templates").data
+        generic_fallback: List[str] = (
+            generic_tpls2 if generic_tpls2 else ["铛铛！为你抽中了{food}！"]
+        )
+        combined: List[str] = spec_phrases + generic_fallback
+        final_text = random.choice(combined).format(**fmt_args)
 
     # 图片配装
-    img_to_send = picked.get("path") if picked.get("has_image") else None
-    meme_to_send = None
+    img_to_send: Optional[str] = picked["path"] if picked["has_image"] else None
+    meme_to_send: Optional[str] = None
 
-    egg_prob = config_snap.get("egg_prob", 10)
-    chef_meme_prob = config_snap.get("chef_meme_prob", 50)
-    global_meme_prob = config_snap.get("global_meme_prob", 30)
-
-    if random.randint(1, 100) <= egg_prob:
-        ganfanren_pool = _image_mgr.get_ganfanren_data()
+    if random.randint(1, 100) <= config_snap["egg_prob"]:
+        ganfanren_pool: Dict[str, GanfanrenData] = _image_mgr.get_ganfanren_data()
         if ganfanren_pool:
-            egg_pool_cfg = config_snap.get("egg_pool", "") or ""
+            egg_pool_cfg: str = config_snap["egg_pool"]
             if egg_pool_cfg.strip() and egg_pool_cfg.strip().lower() != "random":
-                cleaned = egg_pool_cfg.replace("；", ";")
-                allowed = [n.strip() for n in cleaned.split(";") if n.strip()]
-                valid = [n for n in allowed if n in ganfanren_pool] or list(ganfanren_pool.keys())
+                cleaned: str = egg_pool_cfg.replace("；", ";")
+                allowed: List[str] = [
+                    n.strip() for n in cleaned.split(";") if n.strip()
+                ]
+                valid: List[str] = [n for n in allowed if n in ganfanren_pool]
+                if not valid:
+                    valid = list(ganfanren_pool.keys())
             else:
                 valid = list(ganfanren_pool.keys())
-            lucky_name = random.choice(valid)
+            lucky_name: str = random.choice(valid)
             meme_to_send = random.choice(ganfanren_pool[lucky_name]["images"])
-            words_list = ganfanren_pool[lucky_name]["words"]
-            word = random.choice(words_list) if words_list else "但是所有食物被一个神秘吃货一扫而空！"
+            words_list: List[str] = ganfanren_pool[lucky_name]["words"]
+            word: str = (
+                random.choice(words_list)
+                if words_list
+                else "但是所有食物被一个神秘吃货一扫而空！"
+            )
             final_text += f"\n\n{word}"
         else:
             final_text += "\n\n但是所有食物被一个神秘吃货一扫而空！"
     else:
-        if chef_name != "none" and random.randint(1, 100) <= chef_meme_prob:
+        if chef_name != "none" and random.randint(1, 100) <= config_snap["chef_meme_prob"]:
             meme_to_send = _image_mgr.get_chef_image(chef_name)
-        elif random.randint(1, 100) <= global_meme_prob:
+        elif random.randint(1, 100) <= config_snap["global_meme_prob"]:
             meme_to_send = _image_mgr.get_bot_meme(active_key, mood)
 
     segs = [MessageSegment.text(final_text)]
-    if img_to_send:
+    if img_to_send is not None:
         segs.append(MessageSegment.image(Path(img_to_send)))
-    if meme_to_send:
+    if meme_to_send is not None:
         segs.append(MessageSegment.image(Path(meme_to_send)))
     await bot.send(segs)
