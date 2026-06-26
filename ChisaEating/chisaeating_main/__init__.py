@@ -245,9 +245,10 @@ async def chisa_handler(bot: Bot, ev: Event):
             inter_pool = active_phrases.get("打断句式", [f"{bot_name}觉得你点得太频繁了。"])
             inter_text = random.choice(inter_pool).format(bot=bot_name)
             meme_file = _image_mgr.get_bot_meme(active_key, "speechless")
-        await bot.send(inter_text)
+        segs = [MessageSegment.text(inter_text)]
         if meme_file:
-            await bot.send(MessageSegment.image(Path(meme_file)))
+            segs.append(MessageSegment.image(Path(meme_file)))
+        await bot.send(segs)
         return
 
     # 摆烂复读
@@ -258,9 +259,10 @@ async def chisa_handler(bot: Bot, ev: Event):
         fallback_pool = _cfg("generic_templates") or ["是啊，{food}好像都不错"]
         text = random.choice(fallback_pool).format(bot=bot_name, food="什么")
         meme_file = _image_mgr.get_bot_meme(active_key, "think")
-        await bot.send(text)
+        segs = [MessageSegment.text(text)]
         if meme_file:
-            await bot.send(MessageSegment.image(Path(meme_file)))
+            segs.append(MessageSegment.image(Path(meme_file)))
+        await bot.send(segs)
         return
 
     # 扫描卡池
@@ -364,8 +366,9 @@ async def chisa_handler(bot: Bot, ev: Event):
         elif random.randint(1, 100) <= global_meme_prob:
             meme_to_send = _image_mgr.get_bot_meme(active_key, mood)
 
-    await bot.send(final_text)
+    segs = [MessageSegment.text(final_text)]
     if img_to_send:
-        await bot.send(MessageSegment.image(Path(img_to_send)))
+        segs.append(MessageSegment.image(Path(img_to_send)))
     if meme_to_send:
-        await bot.send(MessageSegment.image(Path(meme_to_send)))
+        segs.append(MessageSegment.image(Path(meme_to_send)))
+    await bot.send(segs)
