@@ -10,7 +10,7 @@
 
 一个为 [gscore](https://github.com/Gscore/gsuid_core) 打造的跨次元干饭插件。每天都在纠结吃什么？让二次元向导帮你随机摇号！
 
-> 本插件基于 [dddada123/astrbot_plugin_chisa_still_eating](https://github.com/dddada123/astrbot_plugin_chisa_still_eating) 移植而来，原作者 **Rua432**，原版为 AstrBot 框架插件。本仓库在保留原有核心逻辑与资源的基础上，将其重构为 gscore 框架插件，并内置资源包以便开箱即用。感谢原作者的开源贡献！
+> 本插件基于 [dddada123/astrbot_plugin_chisa_still_eating](https://github.com/dddada123/astrbot_plugin_chisa_still_eating) 移植而来，原作者 [**Rua432**](https://github.com/dddada123)，原版为 AstrBot 框架插件。本仓库在保留原有核心逻辑与资源的基础上，将其重构为 gscore 框架插件，并内置资源包以便开箱即用。感谢原作者的开源贡献！
 
 ---
 
