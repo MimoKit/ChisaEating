@@ -6,7 +6,7 @@
 <div align="center">
   <a href="#丨安装">安装说明</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/Gscore/gsuid_core">gsuid_core</a>
+  <a href="https://github.com/Genshin-bots/gsuid_core">gsuid_core</a>
   &nbsp;·&nbsp;
   <a href="https://github.com/dddada123/astrbot_plugin_chisa_still_eating">原版插件</a>
 </div>
