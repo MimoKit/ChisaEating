@@ -1,0 +1,24 @@
+{
+  "基础点餐": {
+    "desc": "随机推荐食物和饮品",
+    "data": [
+      {"name": "随机干饭", "desc": "全宇宙随机推荐食物", "eg": "吃什么", "need_ck": false, "need_sk": false, "need_admin": false},
+      {"name": "随机饮品", "desc": "全宇宙随机推荐饮品", "eg": "喝什么", "need_ck": false, "need_sk": false, "need_admin": false},
+      {"name": "黑暗料理", "desc": "触发危险料理卡池", "eg": "来点黑暗料理", "need_ck": false, "need_sk": false, "need_admin": false}
+    ]
+  },
+  "指定卡池": {
+    "desc": "按类型或世界指定推荐范围",
+    "data": [
+      {"name": "现实食物", "desc": "仅从三次元食物卡池抽取", "eg": "来点现实的食物", "need_ck": false, "need_sk": false, "need_admin": false},
+      {"name": "现实饮品", "desc": "仅从三次元饮品卡池抽取", "eg": "来点现实的饮品", "need_ck": false, "need_sk": false, "need_admin": false},
+      {"name": "异界特产", "desc": "按世界别称抽取特产，支持鸣潮、原神等别名", "eg": "鸣潮特产", "need_ck": false, "need_sk": false, "need_admin": false}
+    ]
+  },
+  "自定义资源": {
+    "desc": "本地扩展食物和干饭人",
+    "data": [
+      {"name": "自定义干饭人", "desc": "在 data/ChisaEating/ganfanren/ 下添加表情包和 words.txt", "eg": "干饭帮助", "need_ck": false, "need_sk": false, "need_admin": false}
+    ]
+  }
+}
