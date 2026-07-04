@@ -1,5 +1,5 @@
-<p align="center">
-  <a href="https://github.com/nnlmc/ChisaEating"><img src="ICON.png" width="256" height="256" alt="ChisaEating"></a>
+﻿<p align="center">
+  <a href="https://github.com/MimoKit/ChisaEating"><img src="ICON.png" width="256" height="256" alt="ChisaEating"></a>
 </p>
 <h1 align="center">千小妹还在吃 3.0.0</h1>
 <h4 align="center">🚧 支持 gscore 框架的跨次元干饭插件，功能持续更新中 🚧</h4>
@@ -23,7 +23,7 @@
 
 ```bash
 cd gsuid_core/gsuid_core/plugins
-git clone https://github.com/nnlmc/ChisaEating ChisaEating
+git clone https://github.com/MimoKit/ChisaEating ChisaEating
 ```
 
 重启 gscore 后插件自动加载，无需额外配置即可使用内置资源包。
