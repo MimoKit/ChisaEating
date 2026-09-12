@@ -9,7 +9,6 @@ from . import chisaeating_api  # noqa: F401
 from . import chisaeating_config  # noqa: F401,E402
 from . import chisaeating_help  # noqa: F401,E402
 from . import chisaeating_main  # noqa: F401,E402
-from . import chisaeating_assets  # noqa: F401,E402
 
 Plugins(
     name="ChisaEating",

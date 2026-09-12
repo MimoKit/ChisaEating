@@ -1,4 +1,4 @@
-from pathlib import Path
+import json
 
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.gs_config import StringConfig

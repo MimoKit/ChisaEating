@@ -875,7 +875,7 @@
       <div class="skin-manager-tabs">
         <button class="btn btn-small btn-neutral skin-manager-tab active" data-skin-view="builtin" onclick="switchSkinManagerView('builtin', this)">内置皮肤</button>
         <button class="btn btn-small btn-neutral skin-manager-tab" data-skin-view="official" onclick="switchSkinManagerView('official', this)">官方源</button>
-        <button class="btn btn-small btn-neutral skin-manager-tab" data-skin-view="custom" onclick="switchSkinManagerView('custom', this)">第三方源</button>
+        <button class="btn btn-small btn-neutral skin-manager-tab" data-skin-view="custom" onclick="switchSkinManagerView('custom', this)">创意工坊源</button>
         <button class="btn btn-small btn-neutral skin-manager-tab" data-skin-view="downloaded" onclick="switchSkinManagerView('downloaded', this)">已下载</button>
       </div>
 
@@ -891,7 +891,7 @@
       </div>
       <div id="skin-view-custom" class="skin-manager-view">
         <div class="skin-source-toolbar">
-          <input id="skinSourceUrl" type="text" value="https://github.com/dddada123/chisa_dlc_store_test01" placeholder="https://github.com/owner/repo" aria-label="GitHub 皮肤源仓库地址">
+          <input id="skinSourceUrl" type="text" value="https://github.com/dddada123/chisa_dlc_store_test01" placeholder="https://github.com/owner/repo" aria-label="GitHub 创意工坊皮肤仓库地址">
           <button class="btn btn-small" onclick="connectSkinSource()">连接并保存</button>
         </div>
         <div id="skinSourceList" class="skin-source-list"></div>
@@ -1790,7 +1790,7 @@
         var sdk = getSdk();
         if (!sdk) return;
         setSkinGridMessage(containerId, "正在读取皮肤索引...");
-        var params = { mode: mode, node: getSkinDownloadNode() };
+        var params = { mode: mode, node: getSkinDownloadNode(), force: 1 };
         if (source) params.source = source;
         try {
             var items = skinListFromResponse(await sdk.apiGet("skin_index", params));

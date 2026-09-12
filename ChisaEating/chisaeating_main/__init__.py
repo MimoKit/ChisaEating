@@ -1,7 +1,7 @@
 import random
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -26,11 +26,7 @@ from ..utils.image_manager import ImageManager
 from ..utils.rate_limiter import RateLimiter
 import asyncio
 import json
-import shutil
 import aiohttp
-
-# API routes are imported with the plugin so the shared Core server exposes them.
-from .. import web_api as _web_api  # noqa: F401
 
 sv = SV("千小妹还在吃", pm=6, area="ALL")
 
@@ -245,7 +241,10 @@ def _build_config_snapshot() -> ConfigSnapshot:
 
 
 def _is_admin(ev: Event) -> bool:
-    return ev.user_pm <= 3
+    if ev.user_pm <= 3:
+        return True
+    admins = CHISA_CONFIG.get_config("admin_users").data or []
+    return str(ev.user_id) in [str(u).strip() for u in admins if str(u).strip()]
 
 
 def _read_catalog_file() -> List[Dict[str, Any]]:
@@ -700,19 +699,34 @@ async def on_upload_chef(bot: Bot, ev: Event) -> None:
         await bot.send("上传厨师失败：未能保存图片。")
 
 
-@sv.on_fullmatch(("千小妹图库下载进度", "/千小妹图库下载进度"), prefix=False)
+@sv.on_fullmatch(
+    ("千小妹图库下载进度", "/千小妹图库下载进度", "图库下载进度", "千小妹下载进度"),
+    prefix=False,
+)
 async def on_download_progress(bot: Bot, ev: Event) -> None:
     if _DOWNLOAD_STATE.is_downloading:
+        stage_text = {
+            "probing": "正在测速选择最快节点",
+            "downloading": "正在下载",
+            "verifying": "正在校验 SHA-256",
+            "extracting": "正在解压部署",
+        }.get(_DOWNLOAD_STATE.stage, _DOWNLOAD_STATE.stage or "正在搬运")
         await bot.send(
             f"【千小妹基础图库下载进度】\n"
-            f"阶段：{_DOWNLOAD_STATE.stage or '正在搬运'}\n"
+            f"阶段：{stage_text}\n"
             f"当前已下载：{_DOWNLOAD_STATE.downloaded_mb:.2f} MB / {_DOWNLOAD_STATE.total_mb:.2f} MB ({_DOWNLOAD_STATE.percent:.1f}%)"
         )
     else:
-        await bot.send("【千小妹提示】当前没有正在进行的图库下载任务哦。")
+        if has_food_assets(_image_mgr.user_data_dir):
+            await bot.send("【千小妹提示】当前没有正在进行的图库下载任务，本地图库已就绪。")
+        else:
+            await bot.send("【千小妹提示】当前没有正在进行的图库下载任务哦。\n发送「更新千小妹图库」拉取完整基础图库，或发送「千小妹商会」获取美食 DLC。")
 
 
-@sv.on_fullmatch(("更新千小妹图库", "/更新千小妹图库", "千小妹图库重建", "重建千小妹图库"), prefix=False)
+@sv.on_fullmatch(
+    ("更新千小妹图库", "/更新千小妹图库", "下载千小妹图库", "千小妹图库更新", "千小妹图库重建", "重建千小妹图库"),
+    prefix=False,
+)
 async def on_update_assets(bot: Bot, ev: Event) -> None:
     if not _is_admin(ev):
         await bot.send("【权限不足】只有管理员才能执行图库更新与重建指令哦！")
@@ -816,15 +830,9 @@ async def _process_request(
         )
         return
 
-    # 图库为空时引导主人拉取资源（对应上游 v3.5.1 行为）
+    # 如果基础图库未下载，记录调试日志，后续将自动使用文字食物池或DLC
     if not has_food_assets(_image_mgr.user_data_dir):
-        logger.warning(f"[ChisaEating] 图库为空，提示拉取资源 uid={uid}")
-        await bot.send(
-            "【千小妹系统提示】检测到基础图库为空！\n"
-            "请让机器人主人发送「更新千小妹图库」拉取图包，\n"
-            f"或手动将 food 等文件夹放入\n{_image_mgr.user_data_dir}"
-        )
-        return
+        logger.debug(f"[ChisaEating] 本地图库尚未部署完整图片包，使用文字/DLC卡池提供服务 uid={uid}")
 
     # 黑白名单
     if CHISA_CONFIG.get_config("enable_blacklist").data:
@@ -948,19 +956,17 @@ async def _process_request(
     # 强制世界过滤
     if forced_world is not None:
         pool = [item for item in pool if item["wv"] == forced_world]
-    if forced_chef is not None:
-        chef_pool = [item for item in pool if item["chef"] == forced_chef]
-        if not chef_pool:
-            await bot.send(f"【千小妹提示】没有找到厨师“{forced_chef}”的可用料理。")
-            return
-        pool = chef_pool
 
     # 强制厨师过滤
     if forced_chef is not None:
-        chef_pool: List[PoolItem] = [item for item in pool if item.get("chef", "").lower() == forced_chef.lower()]
-        if not chef_pool:
+        chef_pool: List[PoolItem] = [
+            item for item in pool if item.get("chef", "").lower() == forced_chef.lower()
+        ]
+        if not chef_pool and category == "food":
             drink_pool = _image_mgr.scan_all_items(wv_settings, "drink")
-            chef_pool = [item for item in drink_pool if item.get("chef", "").lower() == forced_chef.lower()]
+            chef_pool = [
+                item for item in drink_pool if item.get("chef", "").lower() == forced_chef.lower()
+            ]
         if not chef_pool:
             await bot.send(f"【厨师下班】{forced_chef}今天不在后厨哦～（图库中未找到该厨师的菜品）")
             return
@@ -970,7 +976,10 @@ async def _process_request(
         logger.warning(
             f"[ChisaEating] 卡池为空 category={category} forced_world={forced_world}"
         )
-        await bot.send("【卡池告急】未找到可用的食物/饮品数据！请检查资源目录或配置。")
+        await bot.send(
+            "【卡池告急】未找到可用的食物/饮品数据！\n"
+            "可发送「更新千小妹图库」拉取完整基础图库，或发送「千小妹商会」获取美食 DLC。"
+        )
         return
 
     picked: Optional[PoolItem] = _data_mgr.filter_and_pick(

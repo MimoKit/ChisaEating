@@ -10,11 +10,11 @@ import re
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote, urljoin, urlsplit
 
 import aiohttp
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from gsuid_core.data_store import get_res_path
 from gsuid_core.logger import logger
@@ -28,6 +28,9 @@ SKIN_MIRROR_NODES = (
     "hk.gh-proxy.com",
     "gh.dpik.top",
     "edgeone.gh-proxy.com",
+    "ghfast.top",
+    "ghproxy.net",
+    "mirror.ghproxy.com",
 )
 SKIN_VAR_WHITELIST = {
     "--hover-tint", "--bg", "--panel", "--card", "--text", "--muted",
@@ -1477,7 +1480,7 @@ async def page_skin_index(
 async def page_skin_get(request: Request) -> JSONResponse:
     try:
         payload = await request.json()
-        skin_id = str(payload.get("skin_id", "")).strip()
+        skin_id = str(payload.get("skin_id") or payload.get("id") or "").strip()
         source = payload.get("source")
         force = bool(payload.get("force", False))
         node = payload.get("node", "smart")
@@ -1519,6 +1522,23 @@ async def page_skin_local(source: str = "") -> JSONResponse:
                 except Exception:
                     continue
 
+        root_dir = _skins_dir()
+        if root_dir.exists():
+            for f in root_dir.glob("*.json"):
+                if f.name in ("_sources.json", "_skin_pref.json", "index.json"):
+                    continue
+                try:
+                    with open(f, "r", encoding="utf-8-sig") as jf:
+                        d = json.load(jf)
+                    sid = d.get("id")
+                    if sid and sid not in seen_ids:
+                        seen_ids.add(sid)
+                        if "_source" not in d:
+                            d["_source"] = OFFICIAL_SKIN_SOURCE
+                        skins.append(d)
+                except Exception:
+                    continue
+
         return JSONResponse({"status": "success", "data": skins})
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
@@ -1528,7 +1548,7 @@ async def page_skin_local(source: str = "") -> JSONResponse:
 async def page_skin_delete(request: Request) -> JSONResponse:
     try:
         payload = await request.json()
-        skin_id = str(payload.get("skin_id", "")).strip()
+        skin_id = str(payload.get("skin_id") or payload.get("id") or "").strip()
         source = payload.get("source")
         if not skin_id:
             return JSONResponse({"status": "error", "message": "Missing skin ID"}, status_code=400)
@@ -1540,7 +1560,12 @@ async def page_skin_delete(request: Request) -> JSONResponse:
             cfg_file.unlink()
             deleted = True
 
-        return JSONResponse({"status": "success", "deleted": deleted})
+        return JSONResponse({
+            "status": "success",
+            "deleted": deleted,
+            "id": skin_id,
+            "data": {"id": skin_id, "deleted": deleted},
+        })
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
